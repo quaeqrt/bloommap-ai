@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Bloom Map AI — Full Site Hybrid</title>
+
+  <!-- Leaflet CSS (only used if available) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
+
+  <style>
+    :root { --bg:#0a0a0a; --fg:#ffffff; --muted:#bdbdbd; --acc:#34d399; }
+    *{ box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background: var(--bg); color: var(--fg); }
+    .container { max-width:1100px; margin:0 auto; padding: 0 16px; }
+    .nav { position: sticky; top:0; z-index:10; backdrop-filter: blur(6px); background: rgba(255,255,255,0.06); border-bottom:1px solid rgba(255,255,255,0.12); }
+    .nav-inner { height:56px; display:flex; align-items:center; justify-content:space-between; }
+    .brand { font-weight:700; }
+    .nav-links { display:flex; gap:16px; font-size:14px; }
+    .nav-links a { color:inherit; text-decoration:none; }
+    .btn { padding:8px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.08); color:var(--fg); text-decoration:none; font-size:14px; }
+    .btn:hover { background: rgba(255,255,255,0.12); }
+    .btn.small { font-size:12px; padding:6px 10px; }
+    .hero { padding: 24px 0 8px; }
+    .chips { display:flex; gap:8px; flex-wrap:wrap; }
+    .chip { font-size:12px; padding:6px 10px; border-radius:999px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.16); }
+    h1 { font-size:42px; line-height:1.1; margin: 12px 0; }
+    .accent { color: var(--acc); }
+    .muted { color: var(--muted); }
+    .small { font-size: 13px; }
+    .tiny { font-size: 12px; }
+    .section { padding: 12px 0 20px; }
+    .card { background: rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); border-radius:16px; padding:16px; }
+    .map { height: 540px; border-radius: 16px; overflow: hidden; position:relative; }
+    .controls { margin-bottom: 8px; }
+    .ctrl-row { display:flex; gap:12px; align-items:center; flex-wrap: wrap; }
+    .select, input[type="range"] { background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.2); color:var(--fg); padding:6px 10px; border-radius:10px; }
+    .explain { margin-top: 10px; }
+    .grid { display:grid; gap:12px; }
+    .grid-2 { grid-template-columns: 1fr; }
+    @media(min-width:768px){ .grid-2{ grid-template-columns: 1fr 1fr; } }
+    .person { font-weight:600; }
+    .title { font-weight:600; margin-bottom:6px; }
+    .link { color: var(--fg); }
+    .footer { text-align:center; color:#bdbdbd; padding: 24px 0; border-top:1px solid rgba(255,255,255,0.12); margin-top: 24px; }
+    .legend { position:absolute; right:12px; bottom:12px; background: white; color:#111; padding: 8px 10px; border-radius:10px; font: 12px/14px system-ui, -apple-system, Segoe UI, Roboto, Arial; box-shadow: 0 8px 20px rgba(0,0,0,0.35); }
+    .legend .title { font-weight:600; margin-bottom:4px; }
+    .legend .row { display:flex; align-items:center; gap:6px; }
+    .legend i { width:12px; height:12px; border-radius:50%; display:inline-block; }
+    .note { font-size:12px; margin-top:8px; }
+    /* Map surfaces */
+    #mapLeaflet { position:absolute; inset:0; }
+    #svgMap { position:absolute; inset:0; display:none; }
+    .graticule { stroke:#94a3b8; stroke-opacity:0.18; stroke-width:1; }
+    .label { font: 12px/14px system-ui,-apple-system,Segoe UI,Roboto,Arial; fill: #e5e7eb; paint-order: stroke; stroke:#0b0b0b; stroke-width:2px; }
+    .marker { stroke:#0b0b0b; stroke-width:1; cursor:pointer; }
+    .tooltip { position:absolute; pointer-events:none; background:#111827; border:1px solid #374151; color:#e5e7eb; font-size:12px; padding:8px 10px; border-radius:10px; white-space:nowrap; transform: translate(10px, -10px); box-shadow: 0 8px 20px rgba(0,0,0,0.35); display:none; }
+    .datacard { position:absolute; left:12px; bottom:12px; background:#111827; border:1px solid #374151; border-radius:12px; padding:12px; width:260px; font-size:13px; display:none; color:#e5e7eb; }
+    .mode { position:absolute; top:12px; right:12px; background:#111827; border:1px solid #374151; padding:4px 8px; border-radius:999px; font-size:12px; color:#d1d5db; }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <div class="container nav-inner">
+      <div class="brand">🌸 Bloom Map AI</div>
+      <div class="nav-links">
+        <a href="#map-section">Map</a>
+        <a href="#methodology">Methodology</a>
+        <a href="#judges">For Judges</a>
+        <a href="#team">Team</a>
+        <a href="#contact">Contact</a>
+      </div>
+      <a class="btn" href="#map-section">Open Demo</a>
+    </div>
+  </nav>
+
+  <header class="container hero">
+    <div class="chips">
+      <div class="chip">AI phenology</div>
+      <div class="chip">MODIS and VIIRS</div>
+      <div class="chip">Kazakhstan and region</div>
+    </div>
+    <h1>Real time <span class="accent">Bloom</span> Map</h1>
+    <p class="muted">Bloom Map AI estimates flowering probability using satellite data and machine learning.</p>
+  </header>
+
+  <main class="container">
+    <section id="map-section" class="section">
+      <h2>Interactive map</h2>
+
+      <div class="card controls">
+        <div class="ctrl-row">
+          <label for="monthSelect"><b>Month</b></label>
+          <select id="monthSelect" class="select">
+            <option value="2025-03">March 2025</option>
+            <option value="2025-04">April 2025</option>
+            <option value="2025-05" selected>May 2025</option>
+            <option value="2025-06">June 2025</option>
+          </select>
+
+          <div class="ctrl-row" id="layerBtns">
+            <span class="muted small" style="margin-right:6px;">Layer</span>
+            <button class="btn small" data-layer="bloom">Bloom</button>
+            <button class="btn small" data-layer="ndvi">NDVI</button>
+            <button class="btn small" data-layer="anom">Anomaly</button>
+            <button class="btn small" data-layer="combo">Combo</button>
+          </div>
+
+          <div class="ctrl-row" style="gap:8px;">
+            <span class="muted small">Bloom threshold ≥ <span id="minProbVal">0.00</span></span>
+            <input id="minProb" type="range" min="0" max="1" step="0.05" value="0">
+          </div>
+
+          <div class="ctrl-row">
+            <button id="presetKZ" class="btn small">Kazakhstan wide view</button>
+            <button id="presetAlmaty" class="btn small">Almaty</button>
+            <button id="presetShymkent" class="btn small">Shymkent</button>
+            <button id="presetAstana" class="btn small">Astana</button>
+          </div>
+        </div>
+        <div id="stats" class="muted small">—</div>
+      </div>
+
+      <div class="card map">
+        <div id="mapLeaflet"></div>
+        <svg id="svgMap" viewBox="0 0 1200 540" preserveAspectRatio="xMidYMid meet"></svg>
+        <div class="mode" id="modeBadge">Mode: —</div>
+        <div class="legend" id="legendBox">
+          <div class="title">Legend – Bloom</div>
+          <div class="row"><i style="background:#dcfce7;"></i> 0–0.2</div>
+          <div class="row"><i style="background:#86efac;"></i> 0.2–0.4</div>
+          <div class="row"><i style="background:#22c55e;"></i> 0.4–0.6</div>
+          <div class="row"><i style="background:#166534;"></i> 0.6–0.8</div>
+          <div class="row"><i style="background:#14532d;"></i> 0.8–1.0</div>
+        </div>
+        <div class="datacard" id="dataCard"></div>
+        <div class="tooltip" id="tooltip"></div>
+      </div>
+
+      <p class="muted note">
+        Tip: greener color means higher bloom probability. Switch layers and months to compare. Works online with Leaflet and offline with SVG.
+      </p>
+
+      <div class="card explain">
+        <div><b>What the map shows</b></div>
+        <ul class="muted">
+          <li><b>Bloom</b> — probability from 0 to 1. Demo uses major cities.</li>
+          <li><b>NDVI</b> — vegetation greenness.</li>
+          <li><b>Anomaly</b> — seasonal deviation.</li>
+          <li><b>Combo</b> — center Bloom, middle ring NDVI, outer ring Anomaly.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="methodology" class="section">
+      <h2>Methodology</h2>
+      <div class="grid grid-2">
+        <div class="card">
+          <div class="title">Data sources</div>
+          <ul class="muted">
+            <li><b>MODIS</b> and <b>VIIRS</b> with frequent revisit and 250 to 1000 m and 375 to 750 m</li>
+            <li>NDVI and EVI, land cover from Copernicus and ESA, climate normals, elevation</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="title">Pipeline</div>
+          <ol class="muted">
+            <li>Preprocessing with cloud mask and BRDF and 8 to 16 day composites</li>
+            <li>Features including NDVI and EVI and texture and seasonality</li>
+            <li>Models including LightGBM and CNN and temporal methods</li>
+            <li>Validation with ground references and iNaturalist and PhenoCam</li>
+            <li>Serving as GeoJSON and XYZ tiles into this map</li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    <section id="judges" class="section">
+      <h2>For judges</h2>
+      <div class="card">
+        <ul class="muted">
+          <li><b>Value</b> — early flowering signals for agriculture and pollinators and allergy planning and biodiversity.</li>
+          <li><b>Demo</b> — increase from March to May across cities in Kazakhstan.</li>
+          <li><b>Legend</b> — greener means higher probability and thresholds are shown on the right.</li>
+          <li><b>Next</b> — connect API and tiles and add filters by date and area and export and alerts.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="team" class="section">
+      <h2>Team</h2>
+      <div class="grid grid-2">
+        <div class="card"><div class="muted small">Lead and Strategy and Geospatial</div><div class="person">Yersultan</div></div>
+        <div class="card"><div class="muted small">ML Engineer and Modeling and Validation</div><div class="person">Azamat</div></div>
+        <div class="card"><div class="muted small">UX and UI Designer and Product and Research</div><div class="person">Madina</div></div>
+        <div class="card"><div class="muted small">Full stack Developer and Data Engineering</div><div class="person">Dinmukhammed</div></div>
+      </div>
+    </section>
+
+    <section id="contact" class="section">
+      <h2>Contact</h2>
+      <div class="card">
+        <div class="muted small">Email</div>
+        <div><a class="link" href="mailto:team@bloommap.ai">team@bloommap.ai</a></div>
+        <div class="muted tiny" style="margin-top:8px;">Basemap copyright OpenStreetMap online. Offline mode uses a schematic graticule.</div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">Copyright <span id="year"></span> Bloom Map AI</footer>
+
+  <!-- Leaflet JS if available -->
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+  <script>
+    // ===== Demo data =====
+    const BASE = {
+      "2025-03": [
+        { name: 'Almaty',    lat: 43.239, lng: 76.889, prob: 0.35, ndvi: 0.30, anom: -0.02 },
+        { name: 'Astana',    lat: 51.169, lng: 71.449, prob: 0.18, ndvi: 0.22, anom: -0.10 },
+        { name: 'Karaganda', lat: 49.806, lng: 73.085, prob: 0.22, ndvi: 0.25, anom: -0.06 },
+        { name: 'Shymkent',  lat: 42.317, lng: 69.590, prob: 0.40, ndvi: 0.33, anom:  0.04 },
+        { name: 'Tashkent',  lat: 41.299, lng: 69.240, prob: 0.48, ndvi: 0.36, anom:  0.06 }
+      ],
+      "2025-05": [
+        { name: 'Almaty',    lat: 43.239, lng: 76.889, prob: 0.82, ndvi: 0.51, anom:  0.12 },
+        { name: 'Astana',    lat: 51.169, lng: 71.449, prob: 0.34, ndvi: 0.33, anom: -0.05 },
+        { name: 'Karaganda', lat: 49.806, lng: 73.085, prob: 0.58, ndvi: 0.42, anom:  0.02 },
+        { name: 'Shymkent',  lat: 42.317, lng: 69.590, prob: 0.66, ndvi: 0.47, anom:  0.18 },
+        { name: 'Tashkent',  lat: 41.299, lng: 69.240, prob: 0.73, ndvi: 0.49, anom:  0.05 }
+      ]
+    };
+    const lerp=(a,b,t)=> a+(b-a)*t;
+    const interpMonth=(t)=> BASE["2025-03"].map((p,i)=>({name:p.name,lat:p.lat,lng:p.lng,
+      prob:+(lerp(p.prob, BASE["2025-05"][i].prob, t)).toFixed(2),
+      ndvi:+(lerp(p.ndvi, BASE["2025-05"][i].ndvi, t)).toFixed(2),
+      anom:+(lerp(p.anom, BASE["2025-05"][i].anom, t)).toFixed(2)}));
+    const DATASETS = {
+      "2025-03": BASE["2025-03"],
+      "2025-04": interpMonth(0.5),
+      "2025-05": BASE["2025-05"],
+      "2025-06": interpMonth(1.2)
+    };
+
+    const probColor = (p) => p>0.8? '#14532d' : p>0.6? '#166534' : p>0.4? '#22c55e' : p>0.2? '#86efac' : '#dcfce7';
+    const ndviColor = (v) => v>0.6? '#064e3b' : v>0.4? '#10b981' : v>0.2? '#6ee7b7' : '#d1fae5';
+    const anomColor = (a) => a>0.2? '#ef4444' : a>0? '#f59e0b' : a<-0.2? '#3b82f6' : '#60a5fa';
+
+    const monthSel = document.getElementById('monthSelect');
+    const minProb = document.getElementById('minProb');
+    const minProbVal = document.getElementById('minProbVal');
+    const statsEl  = document.getElementById('stats');
+    const legendBox = document.getElementById('legendBox');
+    const modeBadge = document.getElementById('modeBadge');
+    const tooltip = document.getElementById('tooltip');
+    const dataCard = document.getElementById('dataCard');
+    document.getElementById('year').textContent = new Date().getFullYear();
+    minProbVal.textContent = (+minProb.value).toFixed(2);
+
+    function updateLegend(layer){
+      const title = legendBox.querySelector('.title');
+      const rows = Array.from(legendBox.querySelectorAll('.row'));
+      if (layer==='bloom'){
+        title.textContent='Legend – Bloom';
+        const palette=['#dcfce7','#86efac','#22c55e','#166534','#14532d'];
+        const bins=['0–0.2','0.2–0.4','0.4–0.6','0.6–0.8','0.8–1.0'];
+        rows.forEach((r,i)=>{ r.style.display='flex'; r.querySelector('i').style.background=palette[i]; r.lastChild.textContent=' '+bins[i]; });
+      } else if (layer==='ndvi'){
+        title.textContent='Legend – NDVI';
+        const palette=['#d1fae5','#6ee7b7','#10b981','#0ea5a2','#065f46'];
+        const bins=['0–0.2','0.2–0.4','0.4–0.6','0.6–0.8','0.8–1.0'];
+        rows.forEach((r,i)=>{ r.style.display='flex'; r.querySelector('i').style.background=palette[i]; r.lastChild.textContent=' '+bins[i]; });
+      } else if (layer==='anom'){
+        title.textContent='Legend – Anomaly';
+        rows.forEach((r,i)=>{ r.style.display = (i===0)?'flex':'none'; r.querySelector('i').style.background='#ef4444'; r.lastChild.textContent=' Blue means negative, Orange slight positive, Red strong positive'; });
+      } else {
+        title.textContent='Legend – Combo inner Bloom, middle NDVI, outer Anomaly';
+        const palette=['#dcfce7','#86efac','#22c55e','#166534','#14532d'];
+        rows.forEach((r,i)=>{ r.style.display='flex'; r.querySelector('i').style.background=palette[i]; r.lastChild.textContent=' '+['0–0.2','0.2–0.4','0.4–0.6','0.6–0.8','0.8–1.0'][i]; });
+      }
+    }
+
+    // ===== ONLINE: Leaflet =====
+    function runLeaflet(){
+      if (!(window.L && typeof L.map === 'function')) return null;
+      const map = L.map('mapLeaflet').setView([47.0, 73.0], 5);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap contributors' }).addTo(map);
+      L.control.scale({imperial:false}).addTo(map);
+
+      const layerBloom = L.layerGroup(), layerNDVI  = L.layerGroup(), layerAnom  = L.layerGroup(), layerCombo = L.layerGroup();
+      const overlays = {'Bloom': layerBloom, 'NDVI': layerNDVI, 'Anomaly': layerAnom, 'Combo': layerCombo};
+      L.control.layers({}, overlays, { collapsed: false, position: 'topright' }).addTo(map);
+
+      function clearAll(){ layerBloom.clearLayers(); layerNDVI.clearLayers(); layerAnom.clearLayers(); layerCombo.clearLayers(); }
+
+      function renderOnline(){
+        clearAll();
+        const monthKey = monthSel.value;
+        const pts = DATASETS[monthKey] || [];
+        const thresh = +minProb.value;
+        const meanProb = pts.length ? (pts.reduce((s,p)=>s+p.prob,0)/pts.length) : 0;
+        statsEl.textContent = `Month: ${monthKey} • Points: ${pts.length} • Mean Bloom: ${meanProb.toFixed(2)}`;
+
+        const activeLayer = (document.querySelector('#layerBtns .btn.active')?.dataset.layer) || 'bloom';
+        updateLegend(activeLayer);
+
+        pts.forEach((pt)=>{
+          const r = 6 + Math.round(pt.prob * 6);
+          const pos = [pt.lat, pt.lng];
+          if (activeLayer==='bloom'){
+            if (pt.prob < thresh) return;
+            const c = probColor(pt.prob);
+            L.circleMarker(pos, {radius:r, color:c, fillColor:c, fillOpacity:0.85, weight:1})
+              .bindPopup(`<b>${pt.name}</b><br/>Bloom: ${pt.prob}<br/>NDVI: ${pt.ndvi}<br/>Anomaly: ${pt.anom}`)
+              .addTo(layerBloom);
+          } else if (activeLayer==='ndvi'){
+            const c = ndviColor(pt.ndvi);
+            L.circleMarker(pos, {radius:5, color:c, fillColor:c, fillOpacity:0.8, weight:1})
+              .bindPopup(`<b>${pt.name}</b><br/>NDVI: ${pt.ndvi}<br/>Bloom: ${pt.prob}<br/>Anomaly: ${pt.anom}`)
+              .addTo(layerNDVI);
+          } else if (activeLayer==='anom'){
+            const c = anomColor(pt.anom);
+            L.circleMarker(pos, {radius:5, color:c, fillColor:c, fillOpacity:0.8, weight:1})
+              .bindPopup(`<b>${pt.name}</b><br/>Anomaly: ${pt.anom}<br/>Bloom: ${pt.prob}<br/>NDVI: ${pt.ndvi}`)
+              .addTo(layerAnom);
+          } else {
+            if (pt.prob < thresh) return;
+            const g = L.layerGroup().addTo(layerCombo);
+            L.circleMarker(pos, {radius:r+7, color:anomColor(pt.anom), fillColor:anomColor(pt.anom), fillOpacity:0.7, weight:1}).addTo(g);
+            L.circleMarker(pos, {radius:r+3, color:ndviColor(pt.ndvi), fillColor:ndviColor(pt.ndvi), fillOpacity:0.8, weight:1}).addTo(g);
+            L.circleMarker(pos, {radius:r,   color:probColor(pt.prob), fillColor:probColor(pt.prob), fillOpacity:0.9, weight:1})
+              .bindPopup(`<b>${pt.name}</b><br/>Bloom: ${pt.prob} • NDVI: ${pt.ndvi} • Anomaly: ${pt.anom}`)
+              .addTo(g);
+          }
+        });
+
+        if (activeLayer==='bloom' && !map.hasLayer(layerBloom)) layerBloom.addTo(map);
+        if (activeLayer==='ndvi'  && !map.hasLayer(layerNDVI))  layerNDVI.addTo(map);
+        if (activeLayer==='anom'  && !map.hasLayer(layerAnom))  layerAnom.addTo(map);
+        if (activeLayer==='combo' && !map.hasLayer(layerCombo)) layerCombo.addTo(map);
+      }
+
+      // Wire online controls
+      document.getElementById('presetKZ').onclick       = ()=> map.setView([47.0, 73.0], 5);
+      document.getElementById('presetAlmaty').onclick   = ()=> map.setView([43.25, 76.90], 9);
+      document.getElementById('presetShymkent').onclick = ()=> map.setView([42.32, 69.60], 9);
+      document.getElementById('presetAstana').onclick   = ()=> map.setView([51.17, 71.45], 9);
+      monthSel.onchange = renderOnline;
+      minProb.oninput = ()=>{ minProbVal.textContent = (+minProb.value).toFixed(2); renderOnline(); };
+      document.querySelectorAll('#layerBtns [data-layer]').forEach(btn=>{
+        btn.onclick = ()=>{ document.querySelectorAll('#layerBtns .btn').forEach(b=> b.classList.remove('active')); btn.classList.add('active'); renderOnline(); };
+      });
+
+      document.querySelector('#layerBtns [data-layer="bloom"]').classList.add('active');
+      renderOnline();
+      modeBadge.textContent = 'Mode: Online';
+      document.getElementById('svgMap').style.display='none';
+      document.getElementById('mapLeaflet').style.display='block';
+
+      return { map, render: renderOnline };
+    }
+
+    // ===== OFFLINE: SVG =====
+    (function(){
+      const svg = document.getElementById('svgMap');
+      function circle(cx,cy,r,fill='#fff',stroke='#0b0b0b'){ const el = document.createElementNS('http://www.w3.org/2000/svg','circle'); el.setAttribute('cx',cx); el.setAttribute('cy',cy); el.setAttribute('r',r); el.setAttribute('fill',fill); el.setAttribute('stroke',stroke); el.classList.add('marker'); return el; }
+      function line(x1,y1,x2,y2){ const el = document.createElementNS('http://www.w3.org/2000/svg','line'); el.setAttribute('x1',x1); el.setAttribute('y1',y1); el.setAttribute('x2',x2); el.setAttribute('y2',y2); el.classList.add('graticule'); return el; }
+      function rect(x,y,w,h,fill){ const el = document.createElementNS('http://www.w3.org/2000/svg','rect'); el.setAttribute('x',x); el.setAttribute('y',y); el.setAttribute('width',w); el.setAttribute('height',h); el.setAttribute('fill',fill); return el; }
+      function textEl(x,y,txt){ const el = document.createElementNS('http://www.w3.org/2000/svg','text'); el.setAttribute('x',x); el.setAttribute('y',y); el.textContent = txt; el.classList.add('label'); return el; }
+
+      let lonMin = 46, lonMax = 88.5, latMin = 40, latMax = 56.5;
+      function proj(lat, lon){
+        const W = 1200, H = 540, pad = 16;
+        const x = pad + ( (lon - lonMin) / (lonMax - lonMin) ) * (W - 2*pad);
+        const y = pad + ( 1 - (lat - latMin) / (latMax - latMin) ) * (H - 2*pad);
+        return [x,y];
+      }
+
+      function drawBase(){
+        svg.innerHTML = '';
+        svg.appendChild(rect(0,0,1200,540,'#0b1220'));
+        for (let lon=46; lon<=88.5; lon+=2){ const [x1,y1] = proj(latMin, lon), [x2,y2] = proj(latMax, lon); svg.appendChild(line(x1,y1,x2,y2)); }
+        for (let lat=40; lat<=56.5; lat+=2){ const [x1,y1] = proj(lat, lonMin), [x2,y2] = proj(lat, lonMax); svg.appendChild(line(x1,y1,x2,y2)); }
+        const title = textEl(24, 28, 'KAZAKHSTAN – schematic offline'); title.style.opacity=0.5; svg.appendChild(title);
+        const gM = document.createElementNS('http://www.w3.org/2000/svg','g'); gM.setAttribute('id','gMarkers'); svg.appendChild(gM);
+        const gL = document.createElementNS('http://www.w3.org/2000/svg','g'); gL.setAttribute('id','gLabels'); svg.appendChild(gL);
+      }
+
+      function renderSVG(){
+        drawBase();
+        const monthKey = monthSel.value;
+        const pts = DATASETS[monthKey] || [];
+        const thresh = +minProb.value;
+        const meanProb = pts.length ? (pts.reduce((s,p)=>s+p.prob,0)/pts.length) : 0;
+        statsEl.textContent = `Month: ${monthKey} • Points: ${pts.length} • Mean Bloom: ${meanProb.toFixed(2)}`;
+
+        const gM = document.getElementById('gMarkers'), gL = document.getElementById('gLabels');
+        const activeLayer = (document.querySelector('#layerBtns .btn.active')?.dataset.layer) || 'bloom';
+        updateLegend(activeLayer);
+
+        pts.forEach(pt=>{
+          const [x,y] = proj(pt.lat, pt.lng);
+          const r = 6 + Math.round(pt.prob*6);
+          if (activeLayer==='bloom'){
+            if (pt.prob < thresh) return;
+            gM.appendChild(circle(x,y,r, probColor(pt.prob)));
+          } else if (activeLayer==='ndvi'){
+            gM.appendChild(circle(x,y,5, ndviColor(pt.ndvi)));
+          } else if (activeLayer==='anom'){
+            gM.appendChild(circle(x,y,5, anomColor(pt.anom)));
+          } else {
+            if (pt.prob < thresh) return;
+            gM.appendChild(circle(x,y,r+7, anomColor(pt.anom)));
+            gM.appendChild(circle(x,y,r+3, ndviColor(pt.ndvi)));
+            gM.appendChild(circle(x,y,r,   probColor(pt.prob)));
+          }
+          gL.appendChild(textEl(x + r + 6, y - r - 2, pt.name));
+        });
+
+        function hitTest(e){
+          const t = e.target;
+          if (!(t instanceof SVGElement) || !t.classList.contains('marker')) return null;
+          const cx = +t.getAttribute('cx'), cy = +t.getAttribute('cy');
+          let best=null, bestd=1e9;
+          pts.forEach(p=>{ const [px,py]=proj(p.lat,p.lng); const d=(px-cx)*(px-cx)+(py-cy)*(py-cy); if (d<bestd){bestd=d;best=p;} });
+          return best;
+        }
+        svg.onmousemove = (e)=>{
+          const p = hitTest(e);
+          if (!p){ tooltip.style.display='none'; return; }
+          tooltip.style.display='block'; tooltip.style.left=(e.clientX+12)+'px'; tooltip.style.top=(e.clientY-12)+'px';
+          tooltip.innerHTML = `<b>${p.name}</b><br/>Bloom: ${p.prob} • NDVI: ${p.ndvi} • Anomaly: ${p.anom}`;
+        };
+        svg.onclick = (e)=>{
+          const p = hitTest(e); if (!p){ dataCard.style.display='none'; return; }
+          dataCard.style.display='block';
+          dataCard.innerHTML = `<div style="font-weight:700;">${p.name}</div>
+            <div style="height:1px;background:#374151;margin:8px 0;"></div>
+            <div>Month: <b>${monthKey}</b></div>
+            <div>Bloom probability: <b>${p.prob}</b></div>
+            <div>NDVI: <b>${p.ndvi}</b></div>
+            <div>Anomaly: <b>${p.anom}</b></div>`;
+        };
+      }
+
+      window._svgRender = {
+        init: function(){
+          drawBase();
+          document.querySelector('#layerBtns [data-layer="bloom"]').classList.add('active');
+          renderSVG();
+          modeBadge.textContent = 'Mode: Offline';
+          document.getElementById('mapLeaflet').style.display='none';
+          svg.style.display='block';
+        },
+        setView: function(lat,lon,zoom){
+          if (zoom <= 6){ lonMin=46; lonMax=88.5; latMin=40; latMax=56.5; }
+          else { const spanLat = 2.6, spanLon = 4.2; lonMin = lon - spanLon; lonMax = lon + spanLon; latMin = lat - spanLat; latMax = lat + spanLat; }
+          renderSVG();
+        },
+        render: renderSVG
+      };
+    })();
+
+    // Boot: try Leaflet, else SVG
+    window.addEventListener('load', function(){
+      setTimeout(()=>{
+        const online = runLeaflet();
+        if (!online){ _svgRender.init(); }
+
+        // Common wiring after mode decided
+        if (online){
+          // already wired inside runLeaflet
+        } else {
+          document.getElementById('presetKZ').onclick       = ()=> _svgRender.setView(48,70,5);
+          document.getElementById('presetAlmaty').onclick   = ()=> _svgRender.setView(43.25,76.90,9);
+          document.getElementById('presetShymkent').onclick = ()=> _svgRender.setView(42.32,69.60,9);
+          document.getElementById('presetAstana').onclick   = ()=> _svgRender.setView(51.17,71.45,9);
+          monthSel.onchange = _svgRender.render;
+          minProb.oninput = ()=>{ minProbVal.textContent = (+minProb.value).toFixed(2); _svgRender.render(); };
+          document.querySelectorAll('#layerBtns [data-layer]').forEach(btn=>{
+            btn.onclick = ()=>{ document.querySelectorAll('#layerBtns .btn').forEach(b=> b.classList.remove('active')); btn.classList.add('active'); _svgRender.render(); };
+          });
+        }
+      }, 120);
+    });
+
+    // Footer year
+    document.getElementById('year').textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>
